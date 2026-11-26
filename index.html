@@ -410,9 +410,9 @@ var CONFIG={
  available:false,availableText:"Available for new projects",
  /* 2. SHOWREEL: fill ONE of embed or video */
  showreel:{
-  embed:"",  /* TODO: YouTube or Vimeo page link, e.g. "https://www.youtube.com/watch?v=XXXXXXXXXXX" */
-  video:"",  /* OR a direct file, e.g. "video/showreel.mp4" */
-  poster:""  /* optional cover image, e.g. "img/showreel.jpg" (YouTube covers are found automatically) */
+  embed:"",
+  video:"./showreel.mp4",
+  poster:""
  },
  /* 3. PROJECTS. TODO: for each one set title, desc, thumb (image), and video (mp4/webm preview) or embed (YouTube/Vimeo link).
     cat must match across projects to group them in the filter. year and role are optional. look (k1 to k6) is the placeholder artwork. */
@@ -514,11 +514,35 @@ dlg.addEventListener('close',function(){var vv=dlg.querySelector('video');if(vv)
 $('#dc').addEventListener('click',function(){dlg.close()});
 dlg.addEventListener('click',function(e){if(e.target!==dlg)return;var r=dlg.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dlg.close()});
 d.addEventListener('visibilitychange',function(){if(d.hidden){var vv=dlg.querySelector('video');if(vv)vv.pause();$$('.pj video').forEach(function(x){x.pause()})}});
-/* Missing or broken media falls back to the placeholder artwork */
-d.addEventListener('error',function(e){var t=e.target;if(!t||!t.closest||(t.tagName!=='IMG'&&t.tagName!=='VIDEO'))return;var a=t.closest('.art');
- if(a){t.remove();if(!a.querySelector('img,video')){a.classList.remove('real');if(!a.querySelector('em')){var m=d.createElement('em');m.textContent='Media unavailable';a.appendChild(m)}}}
- else if(t.closest('#ph')){t.remove();$('#ph').classList.remove('has')}
- else if(t.closest('#rs')){t.remove();if(t.tagName==='VIDEO'){$('#rf').classList.remove('playing');$('#rpb').hidden=true;$('#rs').insertAdjacentHTML('beforeend','<p class="rph">Video unavailable</p>')}}},true);
+/* Missing or broken media fallback */
+d.addEventListener('error', function (e) {
+ var t = e.target;
+ if (!t || !t.closest || (t.tagName !== 'IMG' && t.tagName !== 'VIDEO')) return;
+
+ if (t.closest('#rs')) {
+  t.remove();
+  $('#rf').classList.remove('playing');
+  $('#rpb').hidden = false;
+  $('#rs').innerHTML = '<p class="rph">Video unavailable — check showreel.mp4</p>';
+  return;
+ }
+
+ var a = t.closest('.art');
+ if (a) {
+  t.remove();
+  if (!a.querySelector('img,video')) {
+   a.classList.remove('real');
+   if (!a.querySelector('em')) {
+    var m = d.createElement('em');
+    m.textContent = 'Media unavailable';
+    a.appendChild(m);
+   }
+  }
+ } else if (t.closest('#ph')) {
+  t.remove();
+  $('#ph').classList.remove('has');
+ }
+}, true);
 /* Hero letters */
 var lines=$$('#h1 .ln>span'),chs=[];
 lines.forEach(function(l){var t=l.textContent;l.textContent='';[].forEach.call(t,function(ch){var s=d.createElement('span');s.className='c';s.textContent=ch===' '?'\u00a0':ch;l.appendChild(s);chs.push(s)})});
@@ -538,11 +562,58 @@ $('#stats').innerHTML=(AB.stats||[]).map(function(x){return '<div><b>'+esc(x.val
 $('#exp').innerHTML=(AB.experience||[]).map(function(x){return '<li><span class="pe">'+esc(x.period)+'</span><div><h3>'+esc(x.role)+(x.placeholder?'<span class="ph2">Placeholder</span>':'')+'</h3><span class="pc">'+esc(x.place)+'</span><p class="pc">'+esc(x.desc)+'</p></div></li>'}).join('');
 $('#sw').innerHTML=CONFIG.software.map(function(g){return g.items.map(function(i){return '<li><span class="ab" aria-hidden="true">'+esc(i.abbr)+'</span><span><span class="nm">'+esc(i.name)+'</span><small>'+esc(g.group)+'</small></span></li>'}).join('')}).join('');
 $('#cs').innerHTML=CONFIG.skills.map(function(x){return '<li>'+esc(x)+'</li>'}).join('');
-/* Showreel: loads the video only when the visitor presses play */
-var SR=CONFIG.showreel,se=embedUrl(SR.embed),sv=safeUrl(SR.video),spo=safeUrl(SR.poster)||(se&&se.thumb)||'',rs=$('#rs'),rf=$('#rf'),rpb=$('#rpb');
-if(spo)rs.innerHTML='<img src="'+esc(spo)+'" alt="" loading="lazy" decoding="async">';
-if(!se&&!sv){rpb.hidden=true;rs.insertAdjacentHTML('beforeend','<p class="rph">Showreel coming soon</p>')}
-rpb.addEventListener('click',function(){rs.innerHTML=se?'<iframe src="'+esc(se.src)+'&autoplay=1" title="'+esc(CONFIG.name)+' showreel" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>':'<video controls autoplay playsinline'+(spo?' poster="'+esc(spo)+'"':'')+' src="'+esc(sv)+'"></video>';rf.classList.add('playing');rpb.hidden=true;var el=rs.firstChild;if(el&&el.focus)el.focus()});
+/* Showreel: reliable video playback */
+var SR = CONFIG.showreel;
+var se = embedUrl(SR.embed);
+var sv = safeUrl(SR.video);
+var spo = safeUrl(SR.poster) || (se && se.thumb) || '';
+var rs = $('#rs');
+var rf = $('#rf');
+var rpb = $('#rpb');
+
+if (spo) {
+ rs.innerHTML = '<img src="' + esc(spo) + '" alt="Showreel preview">';
+}
+
+if (!se && !sv) {
+ rpb.hidden = true;
+ rs.innerHTML = '<p class="rph">Showreel coming soon</p>';
+}
+
+rpb.addEventListener('click', function () {
+ rs.innerHTML = '';
+
+ if (se) {
+  var frame = d.createElement('iframe');
+  frame.src = se.src + '&autoplay=1';
+  frame.title = CONFIG.name + ' Showreel';
+  frame.allow = 'autoplay; fullscreen; picture-in-picture';
+  frame.allowFullscreen = true;
+  frame.referrerPolicy = 'strict-origin-when-cross-origin';
+  rs.appendChild(frame);
+ } else if (sv) {
+  var video = d.createElement('video');
+  video.controls = true;
+  video.autoplay = true;
+  video.playsInline = true;
+  video.preload = 'metadata';
+  if (spo) video.poster = spo;
+
+  var source = d.createElement('source');
+  source.src = sv;
+  source.type = 'video/mp4';
+  video.appendChild(source);
+  rs.appendChild(video);
+
+  var playAttempt = video.play();
+  if (playAttempt && playAttempt.catch) {
+   playAttempt.catch(function () { video.controls = true; });
+  }
+ }
+
+ rf.classList.add('playing');
+ rpb.hidden = true;
+});
 /* Hero timecode (decorative) */
 var htc=$('#htc');if(htc&&!RM){var t0=performance.now();setInterval(function(){if(!heroOn||d.hidden)return;var f=Math.floor((performance.now()-t0)/41.667);htc.textContent='00:'+pad(Math.floor(f/1440)%60)+':'+pad(Math.floor(f/24)%60)+':'+pad(f%24)},83)}
 /* Availability, portrait, socials, copy, nav highlight */
